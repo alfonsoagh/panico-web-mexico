@@ -1,16 +1,16 @@
+// src/firebase.js
 import { initializeApp } from "firebase/app";
 import { getDatabase } from "firebase/database";
 
-// 🔁 Rellena con TU config del proyecto (la misma de Android)
 const firebaseConfig = {
-  apiKey: "TU_API_KEY",
-  authDomain: "TU_PROJECT_ID.firebaseapp.com",
-  databaseURL: "https://TU_PROJECT_ID-default-rtdb.firebaseio.com",
-  projectId: "TU_PROJECT_ID",
-  storageBucket: "TU_PROJECT_ID.appspot.com",
-  messagingSenderId: "XXXX",
-  appId: "1:XXXX:web:YYYY"
+  apiKey: "AIzaSyD8itA7shBr6YXbbRtvZ6-ERHBGQwJuKQ4",
+  authDomain: "panico-mexico.firebaseapp.com",
+  databaseURL: "https://panico-mexico-default-rtdb.firebaseio.com",
+  projectId: "panico-mexico",
+  storageBucket: "panico-mexico.appspot.com",
+  messagingSenderId: "600814040168",
+  appId: "1:600814040168:web:REEMPLAZA_CON_ID_WEB", // este cambia cuando registres app web
 };
 
-export const app = initializeApp(firebaseConfig);
-export const db  = getDatabase(app);
+const app = initializeApp(firebaseConfig);
+export const db = getDatabase(app);
