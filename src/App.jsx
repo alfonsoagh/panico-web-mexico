@@ -9,12 +9,6 @@ import L from "leaflet";
 /* ===== helpers ===== */
 const fmtMeters = (m) =>
   m == null ? "—" : `${(m >= 100 ? Math.round(m) : Number(m).toFixed(1))} m`;
-const fmtKmh = (mps) => (mps == null ? "—" : `${(Number(mps) * 3.6).toFixed(1)} km/h`);
-const degToCompass = (deg) => {
-  if (deg == null) return "—";
-  const dirs = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSO","SO","OSO","O","ONO","NO","NNO"];
-  return `${Math.round(deg)}° ${dirs[Math.round((deg % 360) / 22.5) % 16]}`;
-};
 const timeAgo = (ts) => {
   if (!ts) return "—";
   const d = (Date.now() - ts) / 1000;
@@ -40,13 +34,21 @@ const injectOnce = (() => {
       html, body, #root { height:100%; margin:0 }
       .leaflet-container { background:#05080f }
       .pmx-header {
-        display:grid; grid-template-columns:1fr auto; gap:10px;
+        display:grid; grid-template-columns: 1fr auto; align-items:center; gap:10px;
         padding:10px 14px; border-bottom:1px solid #21262d;
         backdrop-filter:blur(10px);
         background:linear-gradient(90deg,rgba(255,39,72,.15),rgba(88,166,255,.15));
         color:#f0f6fc;
       }
-      .pmx-brand { display:flex; align-items:center; gap:8px }
+      .pmx-brand { display:flex; align-items:center; gap:10px; min-width:0 }
+      .pmx-status { font-size:12px; color:#8b949e; }
+      .pmx-chips { display:flex; gap:8px; flex-wrap:wrap; justify-self:end; }
+      .pmx-chip {
+        padding:6px 12px; border-radius:999px; font-size:12px;
+        color:#8b949e; border:1px solid #30363d; background:rgba(13,17,23,.65);
+        backdrop-filter: blur(6px); white-space:nowrap;
+      }
+      .pmx-strong { color:#f0f6fc }
       .pmx-fabs { position:absolute; right:10px; bottom:60px; display:grid; gap:8px; z-index:401; }
       .pmx-fab {
         padding:10px; border-radius:14px; border:1px solid #30363d;
@@ -75,6 +77,7 @@ const injectOnce = (() => {
         opacity:0; transition:.2s;
       }
       .pmx-toast.show { opacity:1; transform:translateX(-50%) translateY(-6px); }
+      @media (max-width: 640px) { .pmx-chips { overflow:auto; scrollbar-width:none } .pmx-chips::-webkit-scrollbar{display:none} }
     `;
     document.head.appendChild(s);
     done = true;
@@ -92,7 +95,7 @@ export default function App() {
   const trailRef = useRef(null);
 
   const [connected, setConnected] = useState(false);
-  const [meta, setMeta] = useState({ ts:null, acc:null, spd:null, bear:null });
+  const [meta, setMeta] = useState({ ts:null, acc:null });
 
   const pinIcon = useMemo(() =>
     L.divIcon({
@@ -118,18 +121,18 @@ export default function App() {
       const locRef = ref(db,`shares/${shareId}/location`);
       unsub = onValue(locRef,(snap)=>{
         setConnected(true);
-        const v=snap.val(); if(!v) return;
+        const v=snap.val(); if(!v || v.lat==null || v.lng==null) return;
         const ll=[v.lat,v.lng];
         marker.setLatLng(ll);
         circle.setLatLng(ll).setRadius(v.accuracy||0).setStyle({color:accColor(v.accuracy)});
         const pts=trail.getLatLngs(); pts.push(ll); if(pts.length>60) pts.shift(); trail.setLatLngs(pts);
-        setMeta({ts:v.timestamp, acc:v.accuracy, spd:v.speed, bear:v.bearing});
+        setMeta({ts:v.timestamp||null, acc:v.accuracy??null});
         if(!map._first){map._first=true; map.setView(ll,16,{animate:true});}
       },()=>setConnected(false));
     }
     setTimeout(()=>map.invalidateSize(),50);
     return()=>{unsub&&unsub(); map.remove();}
-  },[shareId,pinIcon]);
+  },[shareId, pinIcon]);
 
   const recenter=()=>{const ll=markerRef.current?.getLatLng();ll&&mapRef.current?.setView(ll,16,{animate:true});};
   const zoomIn=()=>mapRef.current?.zoomIn();
@@ -139,6 +142,7 @@ export default function App() {
     const url=new URL(location.href); if(!shareId) url.searchParams.set("id","TU_ID");
     await navigator.clipboard.writeText(url.toString());
     toast("Enlace copiado");
+    if (navigator.share) { try { await navigator.share({ title:"Pánico México", url:url.toString() }); } catch {} }
   };
   const toast=(msg)=>{
     let el=document.getElementById("pmx-toast");
@@ -147,13 +151,29 @@ export default function App() {
     el._t=setTimeout(()=>el.classList.remove("show"),1500);
   };
 
+  const lastTxt = timeAgo(meta.ts);
+  const accTxt = fmtMeters(meta.acc);
+
   return (
     <div style={{height:"100dvh",display:"grid",gridTemplateRows:"auto 1fr auto",background:"#0d1117"}}>
+      {/* HEADER con chips de precisión y última actualización */}
       <div className="pmx-header">
-        <div className="pmx-brand"><b>Pánico México 🚨🇲🇽</b></div>
-        <span style={{fontSize:12,color:"#8b949e"}}>{connected?"en vivo":"sin conexión"}</span>
+        <div className="pmx-brand">
+          <b>Pánico México 🚨🇲🇽</b>
+          <span className="pmx-status">{connected ? "en vivo" : "sin conexión"}</span>
+        </div>
+
+        <div className="pmx-chips">
+          <span className="pmx-chip">
+            Último: <b className="pmx-strong">{lastTxt}</b>
+          </span>
+          <span className="pmx-chip">
+            Precisión: <b className="pmx-strong" style={{color: accColor(meta.acc)}}>{accTxt}</b>
+          </span>
+        </div>
       </div>
 
+      {/* MAPA + FABs */}
       <div style={{position:"relative"}}>
         <div id="map" style={{width:"100%",height:"100%"}} />
         <div className="pmx-fabs">
@@ -162,11 +182,24 @@ export default function App() {
           <button className="pmx-fab" onClick={zoomIn}>＋</button>
           <button className="pmx-fab" onClick={zoomOut}>－</button>
         </div>
+
+        {/* aviso si no hay id */}
+        {!shareId && (
+          <div style={{
+            position:"absolute", left:10, right:10, top:10, zIndex:402,
+            border:"1px solid #30363d", background:"rgba(22,27,34,.9)", color:"#c9d1d9",
+            borderRadius:14, padding:"10px 12px", backdropFilter:"blur(8px)"
+          }}>
+            Agrega <code>?id=&lt;shareId&gt;</code> a la URL para escuchar una ubicación en vivo.
+          </div>
+        )}
       </div>
 
+      {/* BOTTOM: sólo Compartir */}
       <div className="pmx-bottom">
         <button className="pmx-share" onClick={copyLink}>Compartir</button>
       </div>
+
       <div id="pmx-toast" className="pmx-toast" />
     </div>
   );
