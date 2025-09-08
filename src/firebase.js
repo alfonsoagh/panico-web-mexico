@@ -9,7 +9,7 @@ const firebaseConfig = {
   projectId: "panico-mexico",
   storageBucket: "panico-mexico.appspot.com",
   messagingSenderId: "600814040168",
-  appId: "1:600814040168:web:REEMPLAZA_CON_ID_WEB", // este cambia cuando registres app web
+  appId: "1:600814040168:web:REEMPLAZA_CON_ID_WEB", // <-- registra la app web y pega el real
 };
 
 const app = initializeApp(firebaseConfig);
